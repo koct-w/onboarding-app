@@ -2,18 +2,19 @@
 const masterUrl = `https://google.com`;
 const templateUrl = `https://google.com`;
 
-// Универсальный и надежный разбор CSV формата от Google
+// Простой и надежный разбор CSV от Google по строкам и ячейкам
 function parseCSV(text) {
-    let lines = text.split(\(/\r\)?\n/);
+    // Разделяем текст по обычным переносам строк
+    let lines = text.split('\n');
     return lines.map(line => {
         let result = [];
         let current = '';
         let inQuotes = false;
+        
         for (let i = 0; i < line.length; i++) {
             let char = line[i];
             if (char === '"') {
-                if (inQuotes && line[i+1] === '"') { current += '"'; i++; }
-                else { inQuotes = !inQuotes; }
+                inQuotes = !inQuotes; // Пропускаем кавычки внутри текста
             } else if (char === ',' && !inQuotes) {
                 result.push(current.trim());
                 current = '';
@@ -23,7 +24,7 @@ function parseCSV(text) {
         }
         result.push(current.trim());
         return result;
-    }).filter(row => row.length > 0 && row.some(cell => cell !== ''));
+    }).filter(row => row.length > 0 && row[0] !== '');
 }
 
 async function initApp() {
@@ -33,24 +34,25 @@ async function initApp() {
         const masterText = await masterResponse.text();
         const masterRows = parseCSV(masterText);
         
-        // По умолчанию выставляем заглушки на случай, если строка пуста
+        // Стандартные значения на случай, если таблица еще не до конца прочиталась
         let name = "Колегова Татьяна Евгеньевна";
         let role = "Врач-кардиолог";
         let branch = "Филиал не указан";
         let progress = "55%";
 
-        // Ищем строку, где есть ФИО Колеговой, чтобы взять реальные данные
+        // Ищем строку, в которой написано "Колегова"
         const targetRow = masterRows.find(row => row.some(cell => cell.includes("Колегова")));
         
         if (targetRow) {
-            // Защищенный сбор элементов: если колонка пустая — берем стандартное значение
+            // Google Таблицы: Колонки идут как массив [0, 1, 2, 3...]
+            // Индекс 1 - ФИО (B), Индекс 2 - Должность (C), Индекс 3 - Филиал (D), Индекс 9 - Прогресс (J)
             name = targetRow[1] || name;
             role = targetRow[2] || role;
             branch = targetRow[3] || branch;
             progress = targetRow[9] || progress;
         }
 
-        // Выводим информацию в красивую синюю шапку
+        // Выводим информацию в синюю шапку приложения
         document.getElementById('user-name').innerText = name;
         document.getElementById('user-role').innerText = role;
         document.getElementById('user-branch').innerText = branch;
@@ -65,26 +67,27 @@ async function initApp() {
         const tasksListContainer = document.getElementById('tasks-list');
         tasksListContainer.innerHTML = "";
 
-        // Перебираем строки плана (пропуская первые технические строки шапки)
+        // Перебираем строки плана адаптации
         templateRows.forEach((row, index) => {
-            if (index >= 4) { // Начинаем разбор чуть выше, чтобы зацепить все задачи
-                // Безопасное извлечение ячеек по индексам колонок A, C, E, F
-                const taskStage = row[0] || row[1] || "Этап";
+            // Пропускаем верхние технические строчки, читаем содержательную часть
+            if (index >= 4 && row.length > 4) { 
+                // Индекс 0 - Этап, Индекс 2 - Дедлайн, Индекс 4 - Задача, Индекс 5 - Результат/Ссылка
+                const taskStage = row[0] || "Этап";
                 const taskDeadline = row[2] || "В процессе ИС";
                 const taskTitle = row[4] || "";
                 const taskResultField = row[5] || "";
 
-                // Строгие фильтры: отсекаем пустые блоки и технический текст
+                // Отсекаем пустые блоки и технические заголовки столбцов
                 if (!taskTitle || 
                     taskTitle.includes("Описание задачи") || 
                     taskTitle.trim() === "" || 
                     taskTitle.length < 5) return;
 
-                // Создаем карточку шага адаптации
+                // Создаем красивую карточку шага адаптации
                 const taskCard = document.createElement('div');
                 taskCard.className = "task-card";
                 
-                // Автоматически создаем кнопку, если в ожидаемом результате есть ссылка на Tilda/чат
+                // Если в поле результата есть ссылка (например на Tilda), создаем кнопку
                 let actionBtn = "";
                 if (taskResultField && taskResultField.includes('http')) {
                     actionBtn = `<a href="${taskResultField}" target="_blank" class="task-btn">✍️ Перейти к заполнению / Ссылка</a>`;
