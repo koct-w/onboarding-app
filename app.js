@@ -1,99 +1,98 @@
-// ID вашей опубликованной таблицы "Трекер 2.0"
-const SHEET_PUBLIC_ID = "1aDMcM7AybCH8k-4_98jetqRKeS2UyMtdoYFZPyOjbEs";
+// Автономный массив данных на основе ваших таблиц
+const LOCAL_EMPLOYEE = {
+    name: "Колегова Татьяна Евгеньевна",
+    role: "Врач-кардиолог",
+    branch: "Филиал на Баррикадной",
+    progress: "55%"
+};
 
-// Запросы к конкретным вкладкам через родной API Google, который обходит любые блокировки браузера
-const masterUrl = `https://google.com{SHEET_PUBLIC_ID}/gviz/tq?sheet=Трекер&tqx=out:json`;
-const templateUrl = `https://google.com{SHEET_PUBLIC_ID}/gviz/tq?sheet=План+адаптации+новый&tqx=out:json`;
+const LOCAL_TASKS = [
+    {
+        stage: "Неделя 1 / День 1",
+        deadline: "В первый рабочий день",
+        title: "Оформление в отделе кадров, получение пропуска, вводный инструктаж по охране труда.",
+        link: ""
+    },
+    {
+        stage: "Неделя 1 / День 1",
+        deadline: "В первый рабочий день",
+        title: "Знакомство с руководителем, наставником и коллективом филиала. Получение корпоративной почты.",
+        link: ""
+    },
+    {
+        stage: "Неделя 1",
+        deadline: "До конца 1-й недели",
+        title: "Пройти пульс-опрос по итогам первого рабочего дня и зафиксировать первые впечатления.",
+        link: "https://tilda.ws"
+    },
+    {
+        stage: "Недели 1-2",
+        deadline: "До конца 2-й недели",
+        title: "Изучение стандартов сервиса клиники и базового регламента работы на приёме. Обучение в МИС МАК.",
+        link: ""
+    },
+    {
+        stage: "Недели 1-2",
+        deadline: "Конец 2-й недели",
+        title: "Заполнение Дневника адаптации по итогам двух недель совместно с наставником.",
+        link: "https://tilda.ws"
+    },
+    {
+        stage: "Недели 3-4",
+        deadline: "До конца 4-й недели",
+        title: "Прохождение промежуточного тестирования по знанию внутренних регламентов сети «Семейный доктор».",
+        link: "https://tilda.ws"
+    },
+    {
+        stage: "Недели 4-12",
+        deadline: "До конца 3-го месяца",
+        title: "Выполнение индивидуального плана задач (Action Plan) на испытательный срок. Финальная сертификация.",
+        link: "https://tilda.ws"
+    }
+];
 
-// Вспомогательная функция для безопасного скачивания и очистки JSON от Google
-async function fetchGoogleSheet(url) {
-    const response = await fetch(url);
-    const text = await response.text();
-    // Очищаем служебный текст Google "/*O_o*/ google.visualization.Query.setResponse(...)"
-    const startIdx = text.indexOf('{');
-    const endIdx = text.lastIndexOf('}');
-    const jsonString = text.substring(startIdx, endIdx + 1);
-    return JSON.parse(jsonString);
-}
-
-async function initApp() {
+function initApp() {
     try {
-        // 1. ЧИТАЕМ ДАННЫЕ О СОТРУДНИКЕ (Лист "Трекер")
-        const masterData = await fetchGoogleSheet(masterUrl);
-        const rows = masterData.table.rows;
+        // 1. ВЫВОДИМ ДАННЫЕ О СОТРУДНИКЕ В СИНЮЮ ШАПКУ
+        document.getElementById('user-name').innerText = LOCAL_EMPLOYEE.name;
+        document.getElementById('user-role').innerText = LOCAL_EMPLOYEE.role;
+        document.getElementById('user-branch').innerText = LOCAL_EMPLOYEE.branch;
+        document.getElementById('progress-val').innerText = LOCAL_EMPLOYEE.progress;
+        document.getElementById('progress-fill').style.width = LOCAL_EMPLOYEE.progress;
 
-        // Делаем базовые значения на случай, если нужная строка сместилась
-        let name = "Колегова Татьяна Евгеньевна";
-        let role = "Врач-кардиолог";
-        let branch = "Филиал не указан";
-        let progress = "55%";
-
-        // Ищем строку Татьяны Евгеньевны в таблице
-        const employeeRow = rows.find(row => {
-            return row.c && row.c[1] && row.c[1].v && String(row.c[1].v).includes("Колегова");
-        });
-
-        if (employeeRow && employeeRow.c) {
-            name = employeeRow.c[1]?.v || name;
-            role = employeeRow.c[2]?.v || role;
-            branch = employeeRow.c[3]?.v || branch;
-            progress = employeeRow.c[9]?.v || progress;
-        }
-
-        // Выводим данные в синюю шапку приложения
-        document.getElementById('user-name').innerText = name;
-        document.getElementById('user-role').innerText = role;
-        document.getElementById('user-branch').innerText = branch;
-        document.getElementById('progress-val').innerText = progress;
-        document.getElementById('progress-fill').style.width = String(progress).includes('%') ? progress : progress + '%';
-
-        // 2. ЧИТАЕМ И ВЫВОДИМ ЗАДАЧИ (Лист "План адаптации новый")
-        const templateData = await fetchGoogleSheet(templateUrl);
-        const taskRows = templateData.table.rows;
-        
+        // 2. ВЫВОДИМ КАРТОЧКИ ЗАДАЧ С КНОПКАМИ TILDA
         const tasksListContainer = document.getElementById('tasks-list');
         tasksListContainer.innerHTML = "";
 
-        // Перебираем строки шаблона задач (начиная с 9-й строки таблицы — индекс 8)
-        taskRows.forEach((row, index) => {
-            if (index >= 8 && row.c) {
-                // Извлекаем ячейки по столбцам: A/B (индекс 0/1) - Этап, C (индекс 2) - Дедлайн, E (индекс 4) - Описание, F (индекс 5) - Ссылка
-                const taskStage = row.c[0]?.v || row.c[1]?.v || "Этап";
-                const taskDeadline = row.c[2]?.v || "В процессе ИС";
-                const taskTitle = row.c[4]?.v || "";
-                const taskResultField = row.c[5]?.v || "";
-
-                // Отсекаем пустые блоки
-                if (!taskTitle || taskTitle === "Описание задачи" || String(taskTitle).trim() === "") return;
-
-                // Создаем карточку задачи
-                const taskCard = document.createElement('div');
-                taskCard.className = "task-card";
-                
-                // Проверяем наличие ссылки (Tilda, чаты и т.д.)
-                let actionBtn = "";
-                if (taskResultField && String(taskResultField).includes('http')) {
-                    actionBtn = `<a href="${taskResultField}" target="_blank" class="task-btn">✍️ Перейти по ссылке / Опрос</a>`;
-                }
-
-                taskCard.innerHTML = `
-                    <div class="task-meta">
-                        <span>📌 ${taskStage}</span>
-                        <span>⏱ ${taskDeadline}</span>
-                    </div>
-                    <div class="task-title">${taskTitle}</div>
-                    ${actionBtn}
-                `;
-                tasksListContainer.appendChild(taskCard);
+        LOCAL_TASKS.forEach(task => {
+            const taskCard = document.createElement('div');
+            
+            // Если прогресс 55%, условно подсветим первые три задачи как выполненные
+            const isCompleted = task.stage.includes("День 1");
+            taskCard.className = `task-card ${isCompleted ? 'completed' : ''}`;
+            
+            // Создаем кнопку, если у задачи прописана ссылка на форму Tilda
+            let actionBtn = "";
+            if (task.link && task.link.trim() !== "") {
+                actionBtn = `<a href="${task.link}" target="_blank" class="task-btn">✍️ Пройти опрос / Заполнить форму</a>`;
             }
+
+            taskCard.innerHTML = `
+                <div class="task-meta">
+                    <span>📌 ${task.stage}</span>
+                    <span>⏱ ${task.deadline}</span>
+                </div>
+                <div class="task-title">${taskTitle = task.title}</div>
+                ${actionBtn}
+            `;
+            tasksListContainer.appendChild(taskCard);
         });
 
     } catch (error) {
-        console.error("Ошибка:", error);
-        document.getElementById('user-name').innerText = "Ошибка синхронизации данных";
-        document.getElementById('user-role').innerText = "Проверьте соединение с сетью";
+        console.error("Ошибка отображения:", error);
+        document.getElementById('user-name').innerText = "Ошибка загрузки интерфейса";
     }
 }
 
-// Запуск приложения
-initApp();
+// Старт приложения
+window.onload = initApp;
