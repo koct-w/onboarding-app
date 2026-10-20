@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Семейный Доктор | Онбординг</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
     <div class="app-container">
         
-        <!-- ЭКРАН ВХОДА (АНКЕТА) -->
+        <!-- ЭКРАН ВХОДА (АВТОРИЗАЦИЯ) -->
         <div id="auth-screen" class="auth-screen">
             <div class="auth-card">
                 <div class="auth-logo">АО «Семейный доктор»</div>
@@ -25,7 +25,7 @@
         <div id="main-app-screen" style="display: none;">
             <!-- Шапка профиля -->
             <header class="app-header">
-                <div class="logo">АО «Семейный doctor»</div>
+                <div class="logo">АО «Семейный доктор»</div>
                 <div class="user-info">
                     <h1 id="user-name">Загрузка...</h1>
                     <p id="user-role">...</p>
@@ -36,19 +36,19 @@
                     <div class="progress-text">Прогресс испытательного срока: <span id="progress-val">0%</span></div>
                     <div class="progress-bar"><div id="progress-fill" style="width: 0%"></div></div>
                 </div>
-                <button class="btn-logout" onclick="logoutEmployee()">Выйти</button>
+                <button class="btn-logout" onclick="logoutEmployee()">Выйти из кабинета</button>
             </header>
 
             <!-- Главный экран задач -->
             <main class="app-main">
                 <h2 class="section-title">🗓 Мой индивидуальный план</h2>
                 <div id="tasks-list" class="tasks-list">
-                    <!-- Сюда JS подставит задачи динамически -->
+                    <!-- Сюда код подставит задачи динамически -->
                 </div>
             </main>
         </div>
 
     </div>
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=4"></script>
 </body>
 </html>
