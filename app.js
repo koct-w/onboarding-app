@@ -1,15 +1,15 @@
 const SHEET_PUBLIC_ID = "1aDMcM7AybCH8k-4_98jetqRKeS2UyMtdoYFZPyOjbEs";
 
 // Ссылки через прокси для гарантированного обхода блокировок CORS
-const masterUrl = `https://corsproxy.io?` + encodeURIComponent(`https://google.com{SHEET_PUBLIC_ID}/pub?sheet=Трекер&output=csv`);
-const templateUrl = `https://corsproxy.io?` + encodeURIComponent(`https://google.com{SHEET_PUBLIC_ID}/pub?sheet=План+адаптации+новый&output=csv`);
+const masterUrl = "https://corsproxy.io?" + encodeURIComponent("https://google.com" + SHEET_PUBLIC_ID + "/pub?sheet=Трекер&output=csv");
+const templateUrl = "https://corsproxy.io?" + encodeURIComponent("https://google.com" + SHEET_PUBLIC_ID + "/pub?sheet=План+адаптации+новый&output=csv");
 
-// Самый простой и безотказный способ разделить CSV на строки и ячейки
+// Самый простой способ разделить CSV без опасных символов
 function parseCSV(text) {
-    // Делим текст по переносу строки (учитываем любые форматы систем)
-    let lines = text.split(\(/\r\)?\n/);
+    // Безопасное разделение текста по строкам без регулярных выражений
+    let lines = text.split('\n');
     
-    return lines.map(line => {
+    return lines.map(function(line) {
         let result = [];
         let current = '';
         let inQuotes = false;
@@ -27,7 +27,9 @@ function parseCSV(text) {
         }
         result.push(current.trim());
         return result;
-    }).filter(row => row.length > 0 && row[0] !== '');
+    }).filter(function(row) {
+        return row.length > 0 && row[0] !== '';
+    });
 }
 
 // Функция авторизации по фамилии
@@ -50,8 +52,8 @@ async function loginEmployee() {
         const rows = parseCSV(text);
 
         // Ищем сотрудника по фамилии (без учета регистра букв)
-        const matchedRow = rows.find(row => {
-            return row && row[1] && row[1].toLowerCase().includes(inputName.toLowerCase());
+        const matchedRow = rows.find(function(row) {
+            return row && row[1] && row[1].toLowerCase().indexOf(inputName.toLowerCase()) !== -1;
         });
 
         if (!matchedRow) {
@@ -61,7 +63,7 @@ async function loginEmployee() {
         }
 
         // Вытаскиваем данные сотрудника по точным индексам колонок: 
-        // Индекс 1 (Колонка B) - ФИО, Индекс 2 (Колонка C) - Должность, Индекс 3 (Колонка D) - Филиал, Индекс 9 (Колонка J) - Прогресс
+        // B(1) - ФИО, C(2) - Должность, D(3) - Филиал, J(9) - Прогресс
         const employeeData = {
             name: matchedRow[1] || "Не указано",
             role: matchedRow[2] || "Не указано",
@@ -88,9 +90,8 @@ async function renderMainApp(employee) {
     document.getElementById('user-branch').innerText = employee.branch;
     document.getElementById('progress-val').innerText = employee.progress;
     
-    // Настройка заполнения шкалы прогресса
     let progVal = String(employee.progress);
-    document.getElementById('progress-fill').style.width = progVal.includes('%') ? progVal : progVal + '%';
+    document.getElementById('progress-fill').style.width = progVal.indexOf('%') !== -1 ? progVal : progVal + '%';
 
     try {
         const response = await fetch(templateUrl);
@@ -100,24 +101,23 @@ async function renderMainApp(employee) {
         const tasksListContainer = document.getElementById('tasks-list');
         tasksListContainer.innerHTML = "";
 
-        templateRows.forEach((row, index) => {
+        templateRows.forEach(function(row, index) {
             // Читаем содержательную часть со строчки 9 и далее (индекс 8)
             if (index >= 8 && row.length > 4) {
-                // Индекс 0 (A) - Этап, Индекс 2 (C) - Срок, Индекс 4 (E) - Задача, Индекс 5 (F) - Ссылка на Tilda
-                const taskStage = row[0] || "Этап";
+                // Индекс 1 - Этап, Индекс 2 - Дедлайн, Индекс 4 - Задача, Индекс 5 - Ссылка на Tilda
+                const taskStage = row[1] || "Этап";
                 const taskDeadline = row[2] || "В процессе ИС";
                 const taskTitle = row[4] || "";
                 const taskResultField = row[5] || "";
 
-                if (!taskTitle || taskTitle.includes("Описание задачи") || taskTitle.trim() === "") return;
+                if (!taskTitle || taskTitle.indexOf("Описание задачи") !== -1 || taskTitle.trim() === "") return;
 
                 const taskCard = document.createElement('div');
                 taskCard.className = "task-card";
 
                 let actionBtn = "";
-                // Проверяем, есть ли ссылка на форму или опрос
-                if (taskResultField && taskResultField.includes('http')) {
-                    actionBtn = `<a href="${taskResultField}" target="_blank" class="task-btn">✍️ Пройти опрос / Заполни форму</a>`;
+                if (taskResultField && taskResultField.indexOf('http') !== -1) {
+                    actionBtn = '<a href="' + taskResultField + '" target="_blank" class="task-btn">✍️ Пройти опрос / Заполни форму</a>';
                 }
 
                 taskCard.innerHTML = `
