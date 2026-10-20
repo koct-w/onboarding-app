@@ -1,10 +1,10 @@
 const SHEET_PUBLIC_ID = "1aDMcM7AybCH8k-4_98jetqRKeS2UyMtdoYFZPyOjbEs";
 
-// Используем бесплатный прокси-сервер для обхода сетевых ограничений браузера (CORS)
+// Ссылка через прокси для гарантированного чтения без блокировок браузера
 const masterUrl = `https://corsproxy.io?` + encodeURIComponent(`https://google.com{SHEET_PUBLIC_ID}/pub?sheet=Трекер&output=csv`);
 const templateUrl = `https://corsproxy.io?` + encodeURIComponent(`https://google.com{SHEET_PUBLIC_ID}/pub?sheet=План+адаптации+новый&output=csv`);
 
-// Разбор CSV данных по строкам
+// Разбор строк формата CSV
 function parseCSV(text) {
     let lines = text.split(\(/\r\)?\n/);
     return lines.map(line => {
@@ -27,59 +27,56 @@ function parseCSV(text) {
     }).filter(row => row.length > 0);
 }
 
-// Функция входа
+// Функция авторизации по фамилии
 async function loginEmployee() {
     const inputName = document.getElementById('search-lastname').value.trim();
     const errorDiv = document.getElementById('auth-error');
+    const loginBtn = document.getElementById('btn-login');
     errorDiv.innerText = "";
 
     if (inputName.length < 2) {
-        errorDiv.innerText = "Пожалуйста, введите фамилию корректно.";
+        errorDiv.innerText = "Пожалуйста, введите фамилию.";
         return;
     }
 
-    document.getElementById('btn-login').innerText = "Проверка данных...";
+    loginBtn.innerText = "Проверка данных...";
 
     try {
-        // Скачиваем лист "Трекер"
         const response = await fetch(masterUrl);
         const text = await response.text();
         const rows = parseCSV(text);
 
-        // Ищем сотрудника по введенной фамилии (Регистронезависимо)
+        // Поиск совпадения по фамилии (без учета регистра)
         const matchedRow = rows.find(row => row[1] && row[1].toLowerCase().includes(inputName.toLowerCase()));
 
         if (!matchedRow) {
-            errorDiv.innerText = "Сотрудник с такой фамилией не найден в Трекере 2.0";
-            document.getElementById('btn-login').innerText = "Войти в систему";
+            errorDiv.innerText = "Сотрудник с такой фамилией не найден в базе.";
+            loginBtn.innerText = "Войти в систему";
             return;
         }
 
-        // Если нашли, вытаскиваем его уникальные данные из колонок таблицы
+        // Вытаскиваем данные сотрудника по индексам колонок: B(1) - ФИО, C(2) - Должность, D(3) - Филиал, J(9) - Прогресс
         const employeeData = {
-            name: matchedRow[1],      // Колонка B - ФИО
-            role: matchedRow[2],      // Колонка C - Должность
-            branch: matchedRow[3],    // Колонка D - Филиал
-            progress: matchedRow[9]   // Колонка J - Прогресс ИС
+            name: matchedRow[1] || "Не указано",
+            role: matchedRow[2] || "Не указано",
+            branch: matchedRow[3] || "Не указано",
+            progress: matchedRow[9] || "0%"
         };
 
-        // Запускаем отрисовку его личного кабинета
         renderMainApp(employeeData);
 
     } catch (error) {
         console.error(error);
-        errorDiv.innerText = "Ошибка соединения с таблицей. Попробуйте еще раз.";
-        document.getElementById('btn-login').innerText = "Войти в систему";
+        errorDiv.innerText = " Ошибка соединения. Проверьте публикацию таблицы.";
+        loginBtn.innerText = "Войти в систему";
     }
 }
 
-// Функция отображения личного кабинета и его задач
+// Построение индивидуального экрана онбординга
 async function renderMainApp(employee) {
-    // Переключаем экраны: скрываем вход, показываем приложение
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('main-app-screen').style.display = 'block';
 
-    // Заполняем шапку данными конкретного человека
     document.getElementById('user-name').innerText = employee.name;
     document.getElementById('user-role').innerText = employee.role;
     document.getElementById('user-branch').innerText = employee.branch;
@@ -87,7 +84,6 @@ async function renderMainApp(employee) {
     document.getElementById('progress-fill').style.width = employee.progress.includes('%') ? employee.progress : employee.progress + '%';
 
     try {
-        // Скачиваем эталонный шаблон задач
         const response = await fetch(templateUrl);
         const text = await response.text();
         const templateRows = parseCSV(text);
@@ -95,8 +91,8 @@ async function renderMainApp(employee) {
         const tasksListContainer = document.getElementById('tasks-list');
         tasksListContainer.innerHTML = "";
 
-        // Строим список задач
         templateRows.forEach((row, index) => {
+            // Читаем содержательную часть (строка 9 и далее)
             if (index >= 8 && row.length > 4) {
                 const taskStage = row[0] || row[1] || "Этап";
                 const taskDeadline = row[2] || "В процессе ИС";
@@ -125,11 +121,11 @@ async function renderMainApp(employee) {
             }
         });
     } catch (e) {
-        console.error("Ошибка загрузки задач:", e);
+        console.error("Ошибка построения списка задач:", e);
     }
 }
 
-// Функция выхода
+// Функция сброса сессии (Выход)
 function logoutEmployee() {
     document.getElementById('search-lastname').value = "";
     document.getElementById('auth-screen').style.display = 'flex';
