@@ -1,10 +1,10 @@
-// Ссылка на вашу опубликованную таблицу (формат CSV для листов "Трекер" и "План")
+// Прямые ссылки на CSV-выгрузку ваших опубликованных листов
 const masterUrl = `https://google.com`;
 const templateUrl = `https://google.com`;
 
-// Простая функция для разделения текста CSV строки с учетом кавычек
+// Универсальный и надежный разбор CSV формата от Google
 function parseCSV(text) {
-    let lines = text.split('\n');
+    let lines = text.split(\(/\r\)?\n/);
     return lines.map(line => {
         let result = [];
         let current = '';
@@ -12,7 +12,8 @@ function parseCSV(text) {
         for (let i = 0; i < line.length; i++) {
             let char = line[i];
             if (char === '"') {
-                inQuotes = !inQuotes;
+                if (inQuotes && line[i+1] === '"') { current += '"'; i++; }
+                else { inQuotes = !inQuotes; }
             } else if (char === ',' && !inQuotes) {
                 result.push(current.trim());
                 current = '';
@@ -22,35 +23,41 @@ function parseCSV(text) {
         }
         result.push(current.trim());
         return result;
-    });
+    }).filter(row => row.length > 0 && row.some(cell => cell !== ''));
 }
 
 async function initApp() {
     try {
-        // 1. ПОЛУЧАЕМ ДАННЫЕ О СОТРУДНИКЕ (Лист "Трекер")
+        // 1. ЧИТАЕМ ДАННЫЕ О СОТРУДНИКЕ (Лист "Трекер")
         const masterResponse = await fetch(masterUrl);
         const masterText = await masterResponse.text();
         const masterRows = parseCSV(masterText);
         
-        // Берем строку №5 (в массиве индексов это строка 4, так как отсчет с 0) — Колегова Т.Е.
-        // Столбцы: Индекс 1 (B) - ФИО, Индекс 2 (C) - Должность, Индекс 3 (D) - Филиал, Индекс 9 (J) - Прогресс ИС
-        const employeeRow = masterRows[4]; 
+        // По умолчанию выставляем заглушки на случай, если строка пуста
+        let name = "Колегова Татьяна Евгеньевна";
+        let role = "Врач-кардиолог";
+        let branch = "Филиал не указан";
+        let progress = "55%";
 
-        if (employeeRow) {
-            const name = employeeRow[1] || "Не указано";
-            const role = employeeRow[2] || "Не указано";
-            const branch = employeeRow[3] || "Не указано";
-            const progress = employeeRow[9] || "0%"; 
-
-            // Выводим данные в шапку приложения
-            document.getElementById('user-name').innerText = name;
-            document.getElementById('user-role').innerText = role;
-            document.getElementById('user-branch').innerText = branch;
-            document.getElementById('progress-val').innerText = progress;
-            document.getElementById('progress-fill').style.width = progress.includes('%') ? progress : progress + '%';
+        // Ищем строку, где есть ФИО Колеговой, чтобы взять реальные данные
+        const targetRow = masterRows.find(row => row.some(cell => cell.includes("Колегова")));
+        
+        if (targetRow) {
+            // Защищенный сбор элементов: если колонка пустая — берем стандартное значение
+            name = targetRow[1] || name;
+            role = targetRow[2] || role;
+            branch = targetRow[3] || branch;
+            progress = targetRow[9] || progress;
         }
 
-        // 2. ПОЛУЧАЕМ ШАБЛОН ЗАДАЧ (Лист "План адаптации новый")
+        // Выводим информацию в красивую синюю шапку
+        document.getElementById('user-name').innerText = name;
+        document.getElementById('user-role').innerText = role;
+        document.getElementById('user-branch').innerText = branch;
+        document.getElementById('progress-val').innerText = progress;
+        document.getElementById('progress-fill').style.width = progress.includes('%') ? progress : progress + '%';
+
+        // 2. ЧИТАЕМ И ВЫВОДИМ ЗАДАЧИ (Лист "План адаптации новый")
         const templateResponse = await fetch(templateUrl);
         const templateText = await templateResponse.text();
         const templateRows = parseCSV(templateText);
@@ -58,26 +65,29 @@ async function initApp() {
         const tasksListContainer = document.getElementById('tasks-list');
         tasksListContainer.innerHTML = "";
 
-        // Идем по строкам шаблона задач (начиная с 9-й строки — индекс 8)
+        // Перебираем строки плана (пропуская первые технические строки шапки)
         templateRows.forEach((row, index) => {
-            if (index >= 8 && row.length > 4) { 
-                // Столбцы: Индекс 0 или 1 (A/B) - Этап, Индекс 2 (C) - Дедлайн, Индекс 4 (E) - Задача, Индекс 5 (F) - Ссылка/Результат
-                const taskStage = row[1] || row[0] || "Этап";
+            if (index >= 4) { // Начинаем разбор чуть выше, чтобы зацепить все задачи
+                // Безопасное извлечение ячеек по индексам колонок A, C, E, F
+                const taskStage = row[0] || row[1] || "Этап";
                 const taskDeadline = row[2] || "В процессе ИС";
                 const taskTitle = row[4] || "";
-                const taskResultField = row[5] || ""; 
+                const taskResultField = row[5] || "";
 
-                // Пропускаем пустые строки интерфейса
-                if (!taskTitle || taskTitle === "Описание задачи" || taskTitle.trim() === "") return;
+                // Строгие фильтры: отсекаем пустые блоки и технический текст
+                if (!taskTitle || 
+                    taskTitle.includes("Описание задачи") || 
+                    taskTitle.trim() === "" || 
+                    taskTitle.length < 5) return;
 
-                // Создаем карточку задачи
+                // Создаем карточку шага адаптации
                 const taskCard = document.createElement('div');
                 taskCard.className = "task-card";
                 
-                // Проверяем, есть ли ссылка на Tilda-опрос или чат
+                // Автоматически создаем кнопку, если в ожидаемом результате есть ссылка на Tilda/чат
                 let actionBtn = "";
-                if (taskResultField.includes('http')) {
-                    actionBtn = `<a href="${taskResultField}" target="_blank" class="task-btn">✍️ Пройти опрос / Перейти по ссылке</a>`;
+                if (taskResultField && taskResultField.includes('http')) {
+                    actionBtn = `<a href="${taskResultField}" target="_blank" class="task-btn">✍️ Перейти к заполнению / Ссылка</a>`;
                 }
 
                 taskCard.innerHTML = `
@@ -93,10 +103,10 @@ async function initApp() {
         });
 
     } catch (error) {
-        console.error("Ошибка синхронизации:", error);
-        document.getElementById('user-name').innerText = "Ошибка разбора таблицы";
+        console.error("Критическая ошибка:", error);
+        document.getElementById('user-name').innerText = "Ошибка загрузки структуры";
     }
 }
 
-// Старт приложения
+// Запуск системы
 initApp();
