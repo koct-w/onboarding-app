@@ -1,65 +1,82 @@
-// ID вашей опубликованной таблицы "Трекер 2.0"
-const SHEET_PUBLIC_ID = "1aDMcM7AybCH8k-4_98jetqRKeS2UyMtdoYFZPyOjbEs";
+// Ссылка на вашу опубликованную таблицу (формат CSV для листов "Трекер" и "План")
+const masterUrl = `https://google.com`;
+const templateUrl = `https://google.com`;
 
-// Ссылки на конкретные листы внутри вашего документа
-const masterUrl = `https://google.com{SHEET_PUBLIC_ID}/gviz/tq?sheet=Трекер&tqx=out:json`;
-const templateUrl = `https://google.com{SHEET_PUBLIC_ID}/gviz/tq?sheet=План+адаптации+новый&tqx=out:json`;
+// Простая функция для разделения текста CSV строки с учетом кавычек
+function parseCSV(text) {
+    let lines = text.split('\n');
+    return lines.map(line => {
+        let result = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+            let char = line[i];
+            if (char === '"') {
+                inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+                result.push(current.trim());
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+        result.push(current.trim());
+        return result;
+    });
+}
 
 async function initApp() {
     try {
         // 1. ПОЛУЧАЕМ ДАННЫЕ О СОТРУДНИКЕ (Лист "Трекер")
         const masterResponse = await fetch(masterUrl);
         const masterText = await masterResponse.text();
-        const masterData = JSON.parse(masterText.substr(47).slice(0, -2));
+        const masterRows = parseCSV(masterText);
         
-        const rows = masterData.table.rows;
-        
-        // В качестве шаблона берем строку №5 — Колегова Т.Е. (в массиве данных это индекс 4)
-        // Маппинг колонок листа "Трекер": B - ФИО, C - Должность, D - Филиал, J - Прогресс ИС
-        const employeeRow = rows[4]; 
+        // Берем строку №5 (в массиве индексов это строка 4, так как отсчет с 0) — Колегова Т.Е.
+        // Столбцы: Индекс 1 (B) - ФИО, Индекс 2 (C) - Должность, Индекс 3 (D) - Филиал, Индекс 9 (J) - Прогресс ИС
+        const employeeRow = masterRows[4]; 
 
-        const name = employeeRow.c[1]?.v || "Не указано";
-        const role = employeeRow.c[2]?.v || "Не указано";
-        const branch = employeeRow.c[3]?.v || "Не указано";
-        const progress = employeeRow.c[9]?.v || "0%"; 
+        if (employeeRow) {
+            const name = employeeRow[1] || "Не указано";
+            const role = employeeRow[2] || "Не указано";
+            const branch = employeeRow[3] || "Не указано";
+            const progress = employeeRow[9] || "0%"; 
 
-        // Выводим данные в шапку приложения
-        document.getElementById('user-name').innerText = name;
-        document.getElementById('user-role').innerText = role;
-        document.getElementById('user-branch').innerText = branch;
-        document.getElementById('progress-val').innerText = progress;
-        document.getElementById('progress-fill').style.width = progress;
+            // Выводим данные в шапку приложения
+            document.getElementById('user-name').innerText = name;
+            document.getElementById('user-role').innerText = role;
+            document.getElementById('user-branch').innerText = branch;
+            document.getElementById('progress-val').innerText = progress;
+            document.getElementById('progress-fill').style.width = progress.includes('%') ? progress : progress + '%';
+        }
 
         // 2. ПОЛУЧАЕМ ШАБЛОН ЗАДАЧ (Лист "План адаптации новый")
         const templateResponse = await fetch(templateUrl);
         const templateText = await templateResponse.text();
-        const templateData = JSON.parse(templateText.substr(47).slice(0, -2));
+        const templateRows = parseCSV(templateText);
         
-        const taskRows = templateData.table.rows;
         const tasksListContainer = document.getElementById('tasks-list');
         tasksListContainer.innerHTML = "";
 
-        // Идем по строкам шаблона задач
-        taskRows.forEach((row, index) => {
-            // Начинаем парсить с 9-й строки (индекс 8), чтобы пропустить шапку и пустые строки
-            if (index >= 8 && row.c) { 
-                // Маппинг столбцов по вашему шаблону: 
-                // Этап (A/B), Срок/Дедлайн (C), Описание задачи (E), Ожидаемый результат / Ссылка Tilda (F)
-                const taskStage = row.c[1]?.v || "Этап";
-                const taskDeadline = row.c[2]?.v || "В процессе ИС";
-                const taskTitle = row.c[4]?.v || "Описание задачи";
-                const taskResultField = row.c[5]?.v || ""; 
+        // Идем по строкам шаблона задач (начиная с 9-й строки — индекс 8)
+        templateRows.forEach((row, index) => {
+            if (index >= 8 && row.length > 4) { 
+                // Столбцы: Индекс 0 или 1 (A/B) - Этап, Индекс 2 (C) - Дедлайн, Индекс 4 (E) - Задача, Индекс 5 (F) - Ссылка/Результат
+                const taskStage = row[1] || row[0] || "Этап";
+                const taskDeadline = row[2] || "В процессе ИС";
+                const taskTitle = row[4] || "";
+                const taskResultField = row[5] || ""; 
 
-                // Если задача не заполнена (пустая строка в таблице), пропускаем её
-                if (taskTitle === "Описание задачи" || !row.c[4]) return;
+                // Пропускаем пустые строки интерфейса
+                if (!taskTitle || taskTitle === "Описание задачи" || taskTitle.trim() === "") return;
 
                 // Создаем карточку задачи
                 const taskCard = document.createElement('div');
                 taskCard.className = "task-card";
                 
-                // Проверяем, есть ли ссылка на Tilda-опрос или чат в поле результата
+                // Проверяем, есть ли ссылка на Tilda-опрос или чат
                 let actionBtn = "";
-                if (typeof taskResultField === 'string' && taskResultField.includes('http')) {
+                if (taskResultField.includes('http')) {
                     actionBtn = `<a href="${taskResultField}" target="_blank" class="task-btn">✍️ Пройти опрос / Перейти по ссылке</a>`;
                 }
 
@@ -76,9 +93,8 @@ async function initApp() {
         });
 
     } catch (error) {
-        console.error("Ошибка синхронизации с Google Sheets:", error);
-        document.getElementById('user-name').innerText = "Ошибка доступа к таблице";
-        document.getElementById('user-role').innerText = "Проверьте публикацию в интернете";
+        console.error("Ошибка синхронизации:", error);
+        document.getElementById('user-name').innerText = "Ошибка разбора таблицы";
     }
 }
 
