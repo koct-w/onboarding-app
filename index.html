@@ -8,29 +8,47 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Шапка профиля -->
-        <header class="app-header">
-            <div class="logo">АО «Семейный доктор»</div>
-            <div class="user-info">
-                <h1 id="user-name">Загрузка плана...</h1>
-                <p id="user-role">Пожалуйста, подождите</p>
-                <div class="branch" id="user-branch">Синхронизация данных</div>
+        
+        <!-- ЭКРАН ВХОДА (АНКЕТА) -->
+        <div id="auth-screen" class="auth-screen">
+            <div class="auth-card">
+                <div class="auth-logo">АО «Семейный доктор»</div>
+                <h2>Личный кабинет адаптации</h2>
+                <p>Введите вашу фамилию для входа в план онбординга</p>
+                <input type="text" id="search-lastname" placeholder="Например: Колегова" autocomplete="off">
+                <button id="btn-login" onclick="loginEmployee()">Войти в систему</button>
+                <div id="auth-error" class="auth-error"></div>
             </div>
-            <!-- Прогресс ИС -->
-            <div class="progress-container">
-                <div class="progress-text">Прогресс испытательного срока: <span id="progress-val">0%</span></div>
-                <div class="progress-bar"><div id="progress-fill" style="width: 0%"></div></div>
-            </div>
-        </header>
+        </div>
 
-        <!-- Главный экран задач -->
-        <main class="app-main">
-            <h2 class="section-title">🗓 Мой план адаптации</h2>
-            <div id="tasks-list" class="tasks-list">
-                <!-- Сюда код автоматически подставит задачи из таблицы -->
-            </div>
-        </main>
+        <!-- ОСНОВНОЙ ЭКРАН ПРИЛОЖЕНИЯ (Изначально скрыт) -->
+        <div id="main-app-screen" style="display: none;">
+            <!-- Шапка профиля -->
+            <header class="app-header">
+                <div class="logo">АО «Семейный doctor»</div>
+                <div class="user-info">
+                    <h1 id="user-name">Загрузка...</h1>
+                    <p id="user-role">...</p>
+                    <div class="branch" id="user-branch">...</div>
+                </div>
+                <!-- Прогресс ИС -->
+                <div class="progress-container">
+                    <div class="progress-text">Прогресс испытательного срока: <span id="progress-val">0%</span></div>
+                    <div class="progress-bar"><div id="progress-fill" style="width: 0%"></div></div>
+                </div>
+                <button class="btn-logout" onclick="logoutEmployee()">Выйти</button>
+            </header>
+
+            <!-- Главный экран задач -->
+            <main class="app-main">
+                <h2 class="section-title">🗓 Мой индивидуальный план</h2>
+                <div id="tasks-list" class="tasks-list">
+                    <!-- Сюда JS подставит задачи динамически -->
+                </div>
+            </main>
+        </div>
+
     </div>
-    <script src="app.js"></script>
+    <script src="app.js?v=3"></script>
 </body>
 </html>
