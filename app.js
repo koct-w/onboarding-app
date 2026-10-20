@@ -1,16 +1,19 @@
 const SHEET_PUBLIC_ID = "1aDMcM7AybCH8k-4_98jetqRKeS2UyMtdoYFZPyOjbEs";
 
-// Ссылка через прокси для гарантированного чтения без блокировок браузера
+// Ссылки через прокси для гарантированного обхода блокировок CORS
 const masterUrl = `https://corsproxy.io?` + encodeURIComponent(`https://google.com{SHEET_PUBLIC_ID}/pub?sheet=Трекер&output=csv`);
 const templateUrl = `https://corsproxy.io?` + encodeURIComponent(`https://google.com{SHEET_PUBLIC_ID}/pub?sheet=План+адаптации+новый&output=csv`);
 
-// Разбор строк формата CSV
+// Самый простой и безотказный способ разделить CSV на строки и ячейки
 function parseCSV(text) {
+    // Делим текст по переносу строки (учитываем любые форматы систем)
     let lines = text.split(\(/\r\)?\n/);
+    
     return lines.map(line => {
         let result = [];
         let current = '';
         let inQuotes = false;
+        
         for (let i = 0; i < line.length; i++) {
             let char = line[i];
             if (char === '"') {
@@ -24,7 +27,7 @@ function parseCSV(text) {
         }
         result.push(current.trim());
         return result;
-    }).filter(row => row.length > 0);
+    }).filter(row => row.length > 0 && row[0] !== '');
 }
 
 // Функция авторизации по фамилии
@@ -46,8 +49,10 @@ async function loginEmployee() {
         const text = await response.text();
         const rows = parseCSV(text);
 
-        // Поиск совпадения по фамилии (без учета регистра)
-        const matchedRow = rows.find(row => row[1] && row[1].toLowerCase().includes(inputName.toLowerCase()));
+        // Ищем сотрудника по фамилии (без учета регистра букв)
+        const matchedRow = rows.find(row => {
+            return row && row[1] && row[1].toLowerCase().includes(inputName.toLowerCase());
+        });
 
         if (!matchedRow) {
             errorDiv.innerText = "Сотрудник с такой фамилией не найден в базе.";
@@ -55,7 +60,8 @@ async function loginEmployee() {
             return;
         }
 
-        // Вытаскиваем данные сотрудника по индексам колонок: B(1) - ФИО, C(2) - Должность, D(3) - Филиал, J(9) - Прогресс
+        // Вытаскиваем данные сотрудника по точным индексам колонок: 
+        // Индекс 1 (Колонка B) - ФИО, Индекс 2 (Колонка C) - Должность, Индекс 3 (Колонка D) - Филиал, Индекс 9 (Колонка J) - Прогресс
         const employeeData = {
             name: matchedRow[1] || "Не указано",
             role: matchedRow[2] || "Не указано",
@@ -66,8 +72,8 @@ async function loginEmployee() {
         renderMainApp(employeeData);
 
     } catch (error) {
-        console.error(error);
-        errorDiv.innerText = " Ошибка соединения. Проверьте публикацию таблицы.";
+        console.error("Ошибка сети:", error);
+        errorDiv.innerText = "Ошибка соединения. Убедитесь, что таблица опубликована.";
         loginBtn.innerText = "Войти в систему";
     }
 }
@@ -81,7 +87,10 @@ async function renderMainApp(employee) {
     document.getElementById('user-role').innerText = employee.role;
     document.getElementById('user-branch').innerText = employee.branch;
     document.getElementById('progress-val').innerText = employee.progress;
-    document.getElementById('progress-fill').style.width = employee.progress.includes('%') ? employee.progress : employee.progress + '%';
+    
+    // Настройка заполнения шкалы прогресса
+    let progVal = String(employee.progress);
+    document.getElementById('progress-fill').style.width = progVal.includes('%') ? progVal : progVal + '%';
 
     try {
         const response = await fetch(templateUrl);
@@ -92,9 +101,10 @@ async function renderMainApp(employee) {
         tasksListContainer.innerHTML = "";
 
         templateRows.forEach((row, index) => {
-            // Читаем содержательную часть (строка 9 и далее)
+            // Читаем содержательную часть со строчки 9 и далее (индекс 8)
             if (index >= 8 && row.length > 4) {
-                const taskStage = row[0] || row[1] || "Этап";
+                // Индекс 0 (A) - Этап, Индекс 2 (C) - Срок, Индекс 4 (E) - Задача, Индекс 5 (F) - Ссылка на Tilda
+                const taskStage = row[0] || "Этап";
                 const taskDeadline = row[2] || "В процессе ИС";
                 const taskTitle = row[4] || "";
                 const taskResultField = row[5] || "";
@@ -105,8 +115,9 @@ async function renderMainApp(employee) {
                 taskCard.className = "task-card";
 
                 let actionBtn = "";
+                // Проверяем, есть ли ссылка на форму или опрос
                 if (taskResultField && taskResultField.includes('http')) {
-                    actionBtn = `<a href="${taskResultField}" target="_blank" class="task-btn">✍️ Пройти опрос / Заполнить форму</a>`;
+                    actionBtn = `<a href="${taskResultField}" target="_blank" class="task-btn">✍️ Пройти опрос / Заполни форму</a>`;
                 }
 
                 taskCard.innerHTML = `
@@ -121,11 +132,11 @@ async function renderMainApp(employee) {
             }
         });
     } catch (e) {
-        console.error("Ошибка построения списка задач:", e);
+        console.error("Ошибка построения задач:", e);
     }
 }
 
-// Функция сброса сессии (Выход)
+// Функция выхода из кабинета
 function logoutEmployee() {
     document.getElementById('search-lastname').value = "";
     document.getElementById('auth-screen').style.display = 'flex';
